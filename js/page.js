@@ -1,23 +1,31 @@
+/** 
+ * Extracts just freq and amp from sample array data
+ * json: sample array data from server
+ * return: array of freq,amp tuples
+ **/
 function formatDumpInfo(json) {
-  return json.map(function(sample) {
-    return sample.data.map(function(col) { 
+    return json.data.map(function(col) {
       return {freq: col[0], amp: col[1]};
     })
-  })
 };
 
+/**
+ * valuesArr: list of values
+ * return: one random value of the array
+ **/
 function randomSelect(valuesArr) {
   var choice = Math.floor(Math.random() * valuesArr.length);
-  return [valuesArr[choice]]
+  return valuesArr[choice]
 }
 
+
+/*
+ * Turns a fetch response into a json object
+ * response: fetch response
+ * return: json-ified response
+ */
 function toJSON(response) {
   return response.json()
-}
-
-function debugPrint() {
-  console.log(JSON.stringify(arguments[0]));
-  return arguments[0]
 }
 
 function checkStatus(response) {
@@ -43,8 +51,7 @@ var instantGraph = {
   xGroup: null,
   yGroup: null,
   setup: function(container) {
-    body = container;
-    this.canvas = body.append("svg")
+    this.canvas = container.append("svg")
       .attr('width', this.width)
       .attr('height', this.height);
     this.padding = 30;
@@ -78,31 +85,26 @@ var instantGraph = {
       .call(this.yAxis)
   },
   render: function(values) {
-    this.canvas
-      .selectAll('rect')
-      .data(values[0], keyAccesor)
-      .attr('class', 'col')
-      .style('background-color', function(d) {
-        return this.colorScale(d.amp)
-      }.bind(this))
-      .attr('fill', function(d) { return this.colorScale( d.amp )}.bind(this))
-      .attr('x', function(d) { return this.xScale( d.freq ) + this.padding }.bind(this))
-      .attr('y', function(d) { return  this.height - this.yScale(d.amp) - this.padding }.bind(this))
-      .style('height', function(d) { return this.yScale(d.amp) }.bind(this));
+    function renderSelf(selector) {
+      selector
+        .attr('class', 'col')
+        .style('background-color', function(d) {
+          return this.colorScale(d.amp)
+        }.bind(this))
+        .attr('fill', function(d) { return this.colorScale( d.amp )}.bind(this))
+        .attr('x', function(d) { return this.xScale( d.freq ) + this.padding }.bind(this))
+        .attr('y', function(d) { return  this.height - this.yScale(d.amp) - this.padding }.bind(this))
+        .style('height', function(d) { return this.yScale(d.amp) }.bind(this));
+    }
 
     this.canvas
       .selectAll('rect')
-      .data(values[0], keyAccesor)
+      .data(values, keyAccesor)
+      .call(renderSelf.bind(this))
       .enter()
       .append("rect")
-      .attr('class', 'col')
-      .style('background-color', function(d) {
-        return this.colorScale(d.amp)
-      }.bind(this))
-      .attr('fill', function(d) { return this.colorScale( d.amp )}.bind(this))
-      .attr('x', function(d) { return this.xScale( d.freq ) + this.padding }.bind(this))
-      .attr('y', function(d) { return  this.height - this.yScale(d.amp) - this.padding }.bind(this))
-      .style('height', function(d) { return this.yScale(d.amp) }.bind(this))
+      .call(renderSelf.bind(this))
+      .exit().remove();
   }
 }
 
@@ -120,8 +122,7 @@ var windowGraph = {
   yGroup: null,
   container: null,
   setup: function(container) {
-    body = container;
-    this.canvas = body.append("svg")
+    this.canvas = container.append("svg")
       .attr('width', this.width)
       .attr('height', this.height);
 
@@ -147,8 +148,7 @@ var windowGraph = {
       .range([0, this.width - this.padding * 2]);
 
     this.xAxis = d3.axisBottom(this.xScale);
-    this.xGroup = this.canvas
-      .append('g')
+    this.xGroup = this.canvas .append('g')
       .attr("transform", "translate("+ this.padding + ", " + ( this.height - this.padding ) + ")")
       .call(this.xAxis);
 
@@ -158,34 +158,24 @@ var windowGraph = {
       .call(this.yAxis)
   },
   render: function(values) {
+    this.__data__ = values;
 
     function addIndex(values) {
       var x, y;
       for (y = 0; y < values.length; y++) {
-        for (x = 0; x < values[y][0].length; x++) {
-          values[y][0][x].x = x;
-          values[y][0][x].y = y;
+        for (x = 0; x < values[y].length; x++) {
+          values[y][x].x = x;
+          values[y][x].y = y;
         }
       };
     }
 
-    function innerRender(target) {
-      target
-        .append("rect")
-        .attr('x', function(d) { return this.xScale( d.freq ) + this.padding }.bind(this))
-      // .attr('y', function(d) { return d.y * 30 }.bind(this))
-        .attr('y', function(d) { var val = ( this.yScale(d.y) + this.padding ); console.log(val); return val }.bind(this))
-        .style('height', function(d) { return this.height / this.windowSize }.bind(this))
-        .style('width', function(d) { return 1 }.bind(this))
-        .attr('fill', function(d) { return this.colorScale( d.amp ) }.bind(this))
-    }
-
     function render(target) {
       target
-      .append('rect')
+      // .attr('id', function(d) { return d.x + '-' + d.y })
       .attr('x', function(d) { return this.xScale( d.freq ) + this.padding }.bind(this))
       .attr('y', function(d) { var val = ( this.yScale(d.y) + this.padding ); return val }.bind(this))
-      .style('height', function(d) { return this.height / this.windowSize }.bind(this))
+      .style('height', function(d) {return ( this.height - ( this.padding * 2 ) ) / this.windowSize;}.bind(this))
       .style('width', function(d) { return 1 }.bind(this))
       .attr('fill', function(d) { return this.colorScale( d.amp ) }.bind(this))
     }
@@ -199,31 +189,12 @@ var windowGraph = {
       .append("g").attr('class', 'windowGraph data');
 
     var nodes = group.selectAll('rect')
-    .data(function(d) { return d[0] }, function(d) { return d.x + '-' + d.y });
-
-    render.call(this, nodes);
-    render.call(this, nodes.enter());
-
-    // var updateNodes = this.container
-    //   .selectAll('rect')
-    //   .data(values, function())
-    //     .append("rect")
-    //     .attr('x', function(d) { return this.xScale( d.freq ) + this.padding }.bind(this))
-    //     .attr('y', function(d) { var val = ( this.yScale(d.y) + this.padding ); console.log(val); return val }.bind(this))
-    //     .style('height', function(d) { return this.height / this.windowSize }.bind(this))
-    //     .style('width', function(d) { return 1 }.bind(this))
-    //     .attr('fill', function(d) { return this.colorScale( d.amp ) }.bind(this))
-    // .enter()
-    //     .append("rect")
-    //     .attr('x', function(d) { return this.xScale( d.freq ) + this.padding }.bind(this))
-    //     .attr('y', function(d) { var val = ( this.yScale(d.y) + this.padding ); console.log(val); return val }.bind(this))
-    //     .style('height', function(d) { return this.height / this.windowSize }.bind(this))
-    //     .style('width', function(d) { return 1 }.bind(this))
-    //     .attr('fill', function(d) { return this.colorScale( d.amp ) }.bind(this));
-    // innerRender.call(this,
-    //   updateNodes
-    //   .enter()
-    // );
+    .data(function(d) { return d })
+    .call(render.bind(this))
+    .enter()
+    .append('rect')
+    .call(render.bind(this))
+    .exit().remove();
   }
 }
 
@@ -247,13 +218,13 @@ function renderInstant(values) {
 }
 
 function buffer(size) {
-  var buffer = [];
+  var bufferValues = [];
   return function(values) {
-    buffer.push(values);
-    if(buffer.length > size) {
-      buffer.shift();
+    bufferValues.push(values);
+    if(bufferValues.length > size) {
+      bufferValues.shift();
     }
-    return buffer;
+    return bufferValues;
   }
 }
 
@@ -263,7 +234,6 @@ function loop() {
     .then(toJSON)
     .then(randomSelect)
     .then(formatDumpInfo)
-    // .then(debugPrint)
     .then(renderInstant)
     .then(valueBuffer)
     .then(renderWindow);
@@ -283,7 +253,7 @@ function toggleEnabled() {
 
 setup();
 var valueBuffer = buffer(windowGraph.windowSize);
-setInterval(ifEnabled.bind(this, loop), 1000)
+setInterval(ifEnabled.bind(this, loop), 300)
 // loop();
 
 
