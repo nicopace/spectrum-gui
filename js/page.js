@@ -4,9 +4,9 @@
  * return: array of freq,amp tuples
  **/
 function formatDumpInfo(json) {
-    return json.data.map(function(col) {
-      return {freq: col[0], amp: col[1]};
-    })
+  return json.data.map(function(col) {
+    return {freq: col[0], amp: col[1]};
+  })
 };
 
 /**
@@ -28,14 +28,61 @@ function toJSON(response) {
   return response.json()
 }
 
+/**
+ * Creates a buffer for values. Each time you call the function returned,
+ * it will add the value at the end of the buffer, and return the buffer.
+ * Once you get the ammount of values in the buffer, when you add a new value,
+ * the first added gets dumped.
+ * size: size of the buffer to be created.
+ * return: buffer function
+ **/
+function buffer(size) {
+  var bufferValues = [];
+
+  /**
+   * Adds values to the buffer.
+   * value: value to be added to the buffer.
+   * return: the array of buffered values
+   **/
+  return function(value) {
+    bufferValues.unshift(value);
+    if(bufferValues.length > size) {
+      bufferValues.shift();
+    }
+    return bufferValues;
+  }
+}
+
+/**
+ * Mutates object values adding indexes to them in an two-dimensional matrix
+ * values: a two-dimensional matrix with objects in it
+ * returns: the mutated matrix with x and y values with the indexes
+ * 
+ **/
+function addIndex(values) {
+  var x, y;
+  for (y = 0; y < values.length; y++) {
+    for (x = 0; x < values[y].length; x++) {
+      values[y][x].x = x;
+      values[y][x].y = y;
+    }
+  }
+  return values
+}
+
+/**
+ * Throws error if error happened in the response
+ * response: fetch-like response object
+ * return: fetch-like response object
+ * throws: promise's error
+ **/
 function checkStatus(response) {
-  if (response.ok) {
-    return response;
-  } else {
+  if (! response.ok) {
     var error = new Error(response.statusText);
     error.response = response;
     return Promise.reject(error);
   }
+  return response;
 }
 
 var body;
@@ -99,12 +146,14 @@ var instantGraph = {
 
     this.canvas
       .selectAll('rect')
-      .data(values, keyAccesor)
+      .data(values, function(d) {return d.freq})
       .call(renderSelf.bind(this))
       .enter()
       .append("rect")
       .call(renderSelf.bind(this))
       .exit().remove();
+
+    return values;
   }
 }
 
@@ -158,43 +207,46 @@ var windowGraph = {
       .call(this.yAxis)
   },
   render: function(values) {
-    this.__data__ = values;
-
-    function addIndex(values) {
-      var x, y;
-      for (y = 0; y < values.length; y++) {
-        for (x = 0; x < values[y].length; x++) {
-          values[y][x].x = x;
-          values[y][x].y = y;
-        }
-      };
-    }
 
     function render(target) {
       target
-      // .attr('id', function(d) { return d.x + '-' + d.y })
-      .attr('x', function(d) { return this.xScale( d.freq ) + this.padding }.bind(this))
-      .attr('y', function(d) { var val = ( this.yScale(d.y) + this.padding ); return val }.bind(this))
-      .style('height', function(d) {return ( this.height - ( this.padding * 2 ) ) / this.windowSize;}.bind(this))
-      .style('width', function(d) { return 1 }.bind(this))
-      .attr('fill', function(d) { return this.colorScale( d.amp ) }.bind(this))
+        .attr('id', function(d) { return d.freq})
+        .attr('x', function(d) {
+          var x = this.xScale( d.freq ) + this.padding;
+          return x
+        }.bind(this))
+        .attr('y', function(d) { var val = ( this.yScale(d.y) + this.padding ); return val }.bind(this))
+        .style('height', function(d) {return ( this.height - ( this.padding * 2 ) ) / this.windowSize;}.bind(this))
+        .style('width', function(d) { return 1 }.bind(this))
+        .attr('fill', function(d) { return this.colorScale( d.amp ) }.bind(this))
     }
 
     addIndex(values);
 
-    var group = this.container
-      .selectAll("g.windowGraph.data")
-      .data(values)
+    this.container
+      .selectAll('rect')
+    // .data(values[0], function(d) { return d.freq})
+    // .call(render.bind(this))
       .enter()
-      .append("g").attr('class', 'windowGraph data');
+      .append('rect')
+      .call(render.bind(this))
+      .exit().remove();
 
-    var nodes = group.selectAll('rect')
-    .data(function(d) { return d })
-    .call(render.bind(this))
-    .enter()
-    .append('rect')
-    .call(render.bind(this))
-    .exit().remove();
+    // var group = this.container
+    //   .selectAll("g.windowGraph.data")
+    //   .data(values)
+    //   .enter()
+    //   .append("g").attr('class', 'windowGraph data');
+    //
+    // var nodes = group.selectAll('rect')
+    // .data(function(d) { return d })
+    // .call(render.bind(this))
+    // .enter()
+    // .append('rect')
+    // .call(render.bind(this))
+    // .exit().remove();
+
+    return values;
   }
 }
 
@@ -203,40 +255,15 @@ function setup() {
   windowGraph.setup(d3.select('body'));
 }
 
-function keyAccesor(d) {
-  return d.freq
-}
-
-function renderWindow(values) {
-  windowGraph.render(values);
-}
-
-function renderInstant(values) {
-  instantGraph.render(values);
-
-  return values;
-}
-
-function buffer(size) {
-  var bufferValues = [];
-  return function(values) {
-    bufferValues.push(values);
-    if(bufferValues.length > size) {
-      bufferValues.shift();
-    }
-    return bufferValues;
-  }
-}
-
 function loop() {
   fetch('samples/ath10k_80mhz.dump.json')
     .then(checkStatus)
     .then(toJSON)
     .then(randomSelect)
     .then(formatDumpInfo)
-    .then(renderInstant)
+    .then(instantGraph.render.bind(instantGraph))
     .then(valueBuffer)
-    .then(renderWindow);
+    .then(windowGraph.render.bind(windowGraph));
 }
 
 var enabledFlag = true;
@@ -253,7 +280,5 @@ function toggleEnabled() {
 
 setup();
 var valueBuffer = buffer(windowGraph.windowSize);
-setInterval(ifEnabled.bind(this, loop), 300)
-// loop();
-
+setInterval(ifEnabled.bind(this, loop), 1000)
 
