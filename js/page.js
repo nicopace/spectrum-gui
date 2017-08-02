@@ -47,7 +47,7 @@ function buffer(size) {
   return function(value) {
     bufferValues.unshift(value);
     if(bufferValues.length > size) {
-      bufferValues.shift();
+      bufferValues.pop();
     }
     return bufferValues;
   }
@@ -57,7 +57,7 @@ function buffer(size) {
  * Mutates object values adding indexes to them in an two-dimensional matrix
  * values: a two-dimensional matrix with objects in it
  * returns: the mutated matrix with x and y values with the indexes
- * 
+ *
  **/
 function addIndex(values) {
   var x, y;
@@ -207,44 +207,36 @@ var windowGraph = {
       .call(this.yAxis)
   },
   render: function(values) {
+    addIndex(values);
 
     function render(target) {
       target
-        .attr('id', function(d) { return d.freq})
-        .attr('x', function(d) {
-          var x = this.xScale( d.freq ) + this.padding;
-          return x
-        }.bind(this))
-        .attr('y', function(d) { var val = ( this.yScale(d.y) + this.padding ); return val }.bind(this))
+        .attr('x', function(d) { return this.padding + this.xScale(d.freq) }.bind(this))
+        .attr('y', function(d) { return this.padding + this.yScale(d.y) }.bind(this))
         .style('height', function(d) {return ( this.height - ( this.padding * 2 ) ) / this.windowSize;}.bind(this))
         .style('width', function(d) { return 1 }.bind(this))
         .attr('fill', function(d) { return this.colorScale( d.amp ) }.bind(this))
     }
 
-    addIndex(values);
+    var rows = this.container.selectAll('g.row')
+    .data(values);
 
-    this.container
-      .selectAll('rect')
-    // .data(values[0], function(d) { return d.freq})
-    // .call(render.bind(this))
-      .enter()
+    var rowsEnter = rows.enter()
+    .append('g')
+    .attr('class', 'row')
+    .merge(rows);
+
+
+    var rects = rowsEnter.selectAll('rect')
+      .data(function(row) {return row}, function(d) { return d.freq })
+
+    rects.exit()
+      .remove();
+
+    rects.enter()
       .append('rect')
+      .merge(rects)
       .call(render.bind(this))
-      .exit().remove();
-
-    // var group = this.container
-    //   .selectAll("g.windowGraph.data")
-    //   .data(values)
-    //   .enter()
-    //   .append("g").attr('class', 'windowGraph data');
-    //
-    // var nodes = group.selectAll('rect')
-    // .data(function(d) { return d })
-    // .call(render.bind(this))
-    // .enter()
-    // .append('rect')
-    // .call(render.bind(this))
-    // .exit().remove();
 
     return values;
   }
@@ -280,5 +272,5 @@ function toggleEnabled() {
 
 setup();
 var valueBuffer = buffer(windowGraph.windowSize);
-setInterval(ifEnabled.bind(this, loop), 1000)
+setInterval(ifEnabled.bind(this, loop), 500)
 
