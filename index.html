@@ -2,13 +2,21 @@
   <head>
     <meta charset="utf-8">
     <link rel="stylesheet" href="css/style.css">
+    <style>
+#playpause {
+  position:fixed;
+  right: 0px;
+  bottom: 10px;
+}
+.spectrumGraphs svg {
+  display: block;
+}
+    </style>
   </head>
   <body>
-    <button style="position:fixed; right: 0px; bottom: 10px;" id="playpause" onclick="toggleEnabled()">pause</button>
-    <h1>WaterFall</h1>
-    <h1>Window</h1>
-    <h1>Instant</h1>
-    <div id="instantNode">
+    <div class="spectrumGraphs">
+      <button id="playpause" onclick="toggleEnabled()">pause</button>
+      </div>
     </div>
   </body>
   <script src="./lib/unfetch.umd.js"></script>

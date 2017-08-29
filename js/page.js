@@ -87,10 +87,12 @@ function checkStatus(response) {
 
 var body;
 var instantGraph = {
+  ampDomain: [-110, -50],
+  freqDomain: [5600, 5700],
   canvas: null,
   width: 400,
   height: 500,
-  padding: null,
+  padding: 30,
   domain: null,
   yScale: null,
   xScale: null,
@@ -101,23 +103,21 @@ var instantGraph = {
     this.canvas = container.append("svg")
       .attr('width', this.width)
       .attr('height', this.height);
-    this.padding = 30;
-    this.domain = [-110, -50];
 
     // Amplitude
     this.yScale = d3.scaleLinear()
-      .domain(this.domain)
+      .domain(this.ampDomain)
       .range([0, this.height - this.padding * 2])
       .clamp(true);
 
     // Intensity(Amplitude)
     this.colorScale = d3.scaleLinear()
-      .domain([this.domain[0], (this.domain[0] + this.domain[1])/2, this.domain[1]])
+      .domain([this.ampDomain[0], (this.ampDomain[0] + this.ampDomain[1])/2, this.ampDomain[1]])
       .range(["blue", "green", "red"]);
 
     // Frequency
     this.xScale = d3.scaleLinear()
-      .domain([5600, 5700])
+      .domain(this.freqDomain)
       .range([0, this.width - this.padding * 2]);
 
     this.xAxis = d3.axisBottom(this.xScale);
@@ -243,8 +243,8 @@ var windowGraph = {
 }
 
 function setup() {
-  instantGraph.setup(d3.select('body'));
-  windowGraph.setup(d3.select('body'));
+  instantGraph.setup(d3.select('div.spectrumGraphs'));
+  windowGraph.setup(d3.select('div.spectrumGraphs'));
 }
 
 function loop() {
