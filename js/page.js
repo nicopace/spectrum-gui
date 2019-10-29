@@ -1,3 +1,49 @@
+/**
+ * Returns an array with 256 RGB colors
+ * evenly distributed from "UV" to "Infrared"
+ * respecting the human color perception
+ **/
+function colortable() {
+  /* Poor man's compression - patent pending ;-) */
+  var comp = [[123,[[69,-122]],34,24,[1,17],11,10,9,8,6,[[110,-136]],35,17,16,11,8,9,[1,7],9,[2,6],5,7,[4,5],6,5,4,5,[1,4],6,4,5,[1,4],5,[4,4],[28,5]],
+    [1,[[3,148]],[1,[2,-1]],[[1,-1]],[[2,-1]],-1,[2,[1,-1]],-1,[[1,-1]],[2,-1],[[1,-1]],[8,-1],-2,[1,-1],-2,-1,[1,-2],-1,-2,-1,[4,-2],-3,-2,
+    [2,-3],-2,-4,-3,-5,[1,-4],[1,-5],[1,-8],-10,-16,[[7,-12]],[[2,145]],[[1,-1]],-1,[5,[1,-1]],[2,[2,-1]],[1,[3,-1]],[[4,-1]],[[8,-1]],[[28,-1]],
+    [[3,-1]],[1,3],9,12,[4,9],[[1,2]],[[1,-3]],[1,[1,-1]],-1,[[1,-1]],[1,-1],[[1,-1]],[13,-1],-2,[2,-1],-2,-1,-2,[1,-1],[2,-2],-1,[7,-2],[1,-3],
+    -2,-3,-2,-3,-4,[1,-3],-4,-3,-4,-6,-4,[2,-5],-9,-7,-8,-11,-13,-26,[11,-7]],[[[91,256]],-1,-6,[1,-5],-6,-7,[2,-5],-6,-7,[4,-5],-7,[4,-5],-7,[3,-5],
+    -7,[4,-5],-7,[1,-5],-6,-5,-6,-8,-7,-8,-9,-14,[119,-1]]];
+
+  var channels = [[],[],[]];
+  var colors = [];
+
+  for(var chan = 0; chan < 3; chan++) {
+    var val = 0;
+
+    for(var i = 0; i < comp[chan].length; i++) {
+      if(Object.prototype.toString.call(comp[chan][i]) != '[object Array]') {
+        val = val + comp[chan][i];
+        channels[chan].push(val);
+      } else if(Object.prototype.toString.call(comp[chan][i][0]) == '[object Array]') {
+        val = val + comp[chan][i][0][1];
+        for(var j = 0; j <= comp[chan][i][0][0]; j++) channels[chan].push(val);
+      } else if(Object.prototype.toString.call(comp[chan][i][1]) != '[object Array]') {
+        for(var j = 0; j <= comp[chan][i][0]; j++) {
+          val = val + comp[chan][i][1];
+          channels[chan].push(val);
+        }
+      } else {
+        for(var j = 0; j <= comp[chan][i][0]; j++) {
+          val = val + comp[chan][i][1][1];
+          for(var k = 0; k <= comp[chan][i][1][0]; k++) channels[chan].push(val);
+        }
+      }
+    }
+  }
+
+  for(var i = 0; i < channels[0].length; i++) colors.push([channels[0][i], channels[1][i], channels[2][i]]);
+
+  return colors;
+}
+
 /** 
  * Extracts just freq and amp from sample array data
  * json: sample array data from server
@@ -17,7 +63,6 @@ function randomSelect(valuesArr) {
   var choice = Math.floor(Math.random() * valuesArr.length);
   return valuesArr[choice]
 }
-
 
 /*
  * Turns a fetch response into a json object
@@ -85,6 +130,8 @@ function checkStatus(response) {
   return response;
 }
 
+var ctable = colortable();
+
 var body;
 var instantGraph = {
   ampDomain: [-110, -50],
@@ -112,8 +159,9 @@ var instantGraph = {
 
     // Intensity(Amplitude)
     this.colorScale = d3.scaleLinear()
-      .domain([this.ampDomain[0], (this.ampDomain[0] + this.ampDomain[1])/2, this.ampDomain[1]])
-      .range(["blue", "green", "red"]);
+      .domain(this.ampDomain)
+      .range([0, ctable.length])
+      .clamp(true);
 
     // Frequency
     this.xScale = d3.scaleLinear()
@@ -136,9 +184,10 @@ var instantGraph = {
       selector
         .attr('class', 'col')
         .style('background-color', function(d) {
-          return this.colorScale(d.amp)
-        }.bind(this))
-        .attr('fill', function(d) { return this.colorScale( d.amp )}.bind(this))
+                        var c = ctable[Math.floor(this.colorScale( d.amp ))];
+                        return ("rgb(" + c[0] + "," + c[1] + "," + c[2] + ")");
+                }.bind(this))
+        .attr('fill', function(d) {var c = ctable[Math.floor(this.colorScale( d.amp ))]; return ("rgb("+c[0]+","+c[1]+","+c[2]+")");}.bind(this))
         .attr('x', function(d) { return this.xScale( d.freq ) + this.padding }.bind(this))
         .attr('y', function(d) { return  this.height - this.yScale(d.amp) - this.padding }.bind(this))
         .style('height', function(d) { return this.yScale(d.amp) }.bind(this));
@@ -188,8 +237,9 @@ var windowGraph = {
 
     // Intensity(Amplitude)
     this.colorScale = d3.scaleLinear()
-      .domain([this.domain[0], (this.domain[0] + this.domain[1])/2, this.domain[1]])
-      .range(["blue", "green", "red"]);
+      .domain([this.domain[0], this.domain[1]])
+      .range([0, ctable.length])
+     .clamp(true);
 
     // Frequency
     this.xScale = d3.scaleLinear()
@@ -215,7 +265,10 @@ var windowGraph = {
         .attr('y', function(d) { return this.padding + this.yScale(d.y) }.bind(this))
         .style('height', function(d) {return ( this.height - ( this.padding * 2 ) ) / this.windowSize;}.bind(this))
         .style('width', function(d) { return 1 }.bind(this))
-        .attr('fill', function(d) { return this.colorScale( d.amp ) }.bind(this))
+        .attr('fill', function(d) {
+                var c = ctable[Math.floor(this.colorScale( d.amp ))];
+                return ("rgb(" + c[0] + "," + c[1] + "," + c[2] + ")");
+              }.bind(this))
     }
 
     var rows = this.container.selectAll('g.row')
@@ -273,4 +326,3 @@ function toggleEnabled() {
 setup();
 var valueBuffer = buffer(windowGraph.windowSize);
 setInterval(ifEnabled.bind(this, loop), 500)
-
